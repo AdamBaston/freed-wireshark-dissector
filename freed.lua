@@ -25,7 +25,7 @@
 -- You may need to create this folder.
 
 -- FreeD wireshark disector 
--- Will read the raw data from rotation and location in degrees and meters, zoom and focus fields are just the raw vales
+-- Will read the raw data from rotation and location in degrees and meters, zoom and focus fields are just the raw vales, Iris in F stop and timestamp
 -- Does not support additional data being sent in the freeD packet
 
 
@@ -44,9 +44,10 @@ local zoom = ProtoField.int32("freed.zoom","Zoom",base.DEC)
 local focus = ProtoField.int32("freed.focus","Focus",base.DEC)
 local camera_id = ProtoField.int32("freed.camera_id","Camera ID",base.DEC)
 
-local spare = ProtoField.int32("freed.spare","Spare",base.DEC)
+local iris = ProtoField.uint32("freed.iris","Iris",base.DEC)
+local timestamp = ProtoField.uint32("freed.timestamp","Timestamp",base.DEC)
 
-freed_protocol.fields = {pos_x, pos_y,pos_z,rotation_x,rotation_y,rotation_z,zoom,focus,camera_id,spare}
+freed_protocol.fields = {pos_x, pos_y,pos_z,rotation_x,rotation_y,rotation_z,zoom,focus,camera_id,iris,timestamp}
 
 function freed_protocol.dissector(buffer, pinfo, tree)
   length = buffer:len()
@@ -65,11 +66,13 @@ function freed_protocol.dissector(buffer, pinfo, tree)
   subtree:add(rotation_y,buffer(2,3)):set_text("Rotation Y : ".. buffer(2,3):int()/-32768.0 .. "°")
   subtree:add(rotation_z,buffer(8,3)):set_text("Rotation Z : ".. buffer(8,3):int()/32768.0 .. "°")
  
-  subtree:add(zoom,buffer(20,3)):set_text("Zoom : ".. buffer(20,3):int().. "")
-  subtree:add(focus,buffer(23,3)):set_text("Focus : ".. buffer(20,3):int().."")
+  subtree:add(zoom,buffer(20,3)):set_text("Zoom : ".. buffer(20,3):uint().. "")
+  subtree:add(focus,buffer(23,3)):set_text("Focus : ".. buffer(20,3):uint().."")
   subtree:add(camera_id,buffer(1,1))
 
-  subtree:add(spare,buffer(26,3))
+  subtree:add(iris,buffer(26,2)):set_text("Iris : f"..buffer(26,2):uint()/100 .."") 
+  subtree:add(timestamp,buffer(28,1)):set_text("Timestamp : "..buffer(28,1):uint().. "")
+  -- 
  
 end
 
