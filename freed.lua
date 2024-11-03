@@ -39,7 +39,6 @@ local rotation_x = ProtoField.int32("freed.rotation_x","rotation X",base.DEC)
 local rotation_y = ProtoField.int32("freed.rotation_y","rotation Y",base.DEC)
 local rotation_z = ProtoField.int32("freed.rotation_z","rotation Z",base.DEC)
 
-
 local zoom = ProtoField.int32("freed.zoom","Zoom",base.DEC)
 local focus = ProtoField.int32("freed.focus","Focus",base.DEC)
 local camera_id = ProtoField.int32("freed.camera_id","Camera ID",base.DEC)
@@ -50,13 +49,13 @@ local timestamp = ProtoField.uint32("freed.timestamp","Timestamp",base.DEC)
 freed_protocol.fields = {pos_x, pos_y,pos_z,rotation_x,rotation_y,rotation_z,zoom,focus,camera_id,iris,timestamp}
 
 function freed_protocol.dissector(buffer, pinfo, tree)
-  length = buffer:len()
-  if length == 0 then return end
+  -- Check if UDP payload could be a D1 packet
+  if buffer:len() ~= 29 then return end
+  if buffer(0,1):uint() ~= 0xD1 then return end
   
   pinfo.cols.protocol = freed_protocol.name
   
   local subtree = tree:add(freed_protocol, buffer(), "FreeD Tracking Data")	
-
   
   subtree:add(pos_x,buffer(11,3)):set_text("Position X : ".. buffer(11,3):int()/64000.0 .. "m")
   subtree:add(pos_y,buffer(17,3)):set_text("Position Y : ".. buffer(17,3):int()/64000.0 .. "m")
@@ -72,11 +71,6 @@ function freed_protocol.dissector(buffer, pinfo, tree)
 
   subtree:add(iris,buffer(26,2)):set_text("Iris : f"..buffer(26,2):uint()/100 .."") 
   subtree:add(timestamp,buffer(28,1)):set_text("Timestamp : "..buffer(28,1):uint().. "")
- 
- 
 end
 
-local tcp_port = DissectorTable.get("udp.port")
-local udp_port = DissectorTable.get("tcp.port")
-tcp_port:add(6000, freed_protocol)
-udp_port:add(6000, freed_protocol)
+freed_protocol:register_heuristic("udp", freed_protocol.dissector)
