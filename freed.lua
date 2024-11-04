@@ -44,9 +44,9 @@ local focus = ProtoField.int32("freed.focus","Focus",base.DEC)
 local camera_id = ProtoField.int32("freed.camera_id","Camera ID",base.DEC)
 
 local iris = ProtoField.uint32("freed.iris","Iris",base.DEC)
-local timestamp = ProtoField.uint32("freed.timestamp","Timestamp",base.DEC)
+local checksum = ProtoField.uint32("freed.checksum","Checksum", base.HEX)
 
-freed_protocol.fields = {pos_x, pos_y,pos_z,rotation_x,rotation_y,rotation_z,zoom,focus,camera_id,iris,timestamp}
+freed_protocol.fields = {pos_x, pos_y,pos_z,rotation_x,rotation_y,rotation_z,zoom,focus,camera_id,iris, checksum}
 
 function freed_protocol.dissector(buffer, pinfo, tree)
   -- Check if UDP payload could be a D1 packet
@@ -70,7 +70,22 @@ function freed_protocol.dissector(buffer, pinfo, tree)
   subtree:add(camera_id,buffer(1,1))
 
   subtree:add(iris,buffer(26,2)):set_text("Iris : f"..buffer(26,2):uint()/100 .."") 
-  subtree:add(timestamp,buffer(28,1)):set_text("Timestamp : "..buffer(28,1):uint().. "")
+
+
+
+  -- The checksum is calculated by subtracting (modulo 256) each byte of the
+  -- message, including the message type, from 40 (hex).
+  local checksum_calc = 0x40
+  for i=0,27 do
+    checksum_calc = bit.band(checksum_calc - buffer(i,1):uint(), 0xFF)
+  end
+
+  if checksum_calc == buffer(28,1):uint() then
+    subtree:add(checksum,buffer(28,1)):set_text("Checksum OK : 0x"..string.format("%02X", buffer(28,1):uint()))
+  else
+    subtree:add(checksum,buffer(28,1)):set_text("Checksum FAIL : 0x"..string.format("%02X", buffer(28,1):uint()))
+  end
+
 end
 
 freed_protocol:register_heuristic("udp", freed_protocol.dissector)
