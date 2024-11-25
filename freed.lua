@@ -47,6 +47,22 @@ local checksum = ProtoField.uint32("freed.checksum","Checksum", base.HEX)
 
 freed_protocol.fields = {message_type, camera_id, pan, tilt, roll, x, y, height, zoom, focus, user, checksum}
 
+function read_int24(buffer, offset)
+  local value = buffer(offset, 3):int()
+  if bit.band(value, 0x800000) ~= 0 then
+    value = bit.bor(value, 0xFF000000)
+  end
+  return value
+end
+
+function read_angle(buffer, offset)
+  return read_int24(buffer, offset) / 32768.0
+end
+
+function read_position(buffer, offset)
+  return read_int24(buffer, offset) / 64000.0
+end
+
 function freed_protocol.dissector(buffer, pinfo, tree)
   -- Check if UDP payload could be a D1 packet
   if buffer:len() ~= 29 then return end
@@ -59,13 +75,13 @@ function freed_protocol.dissector(buffer, pinfo, tree)
   subtree:add(message_type,buffer(0,1)):set_text("Message Type : "..string.format("%02X", buffer(0,1):uint()))
   subtree:add(camera_id,buffer(1,1)):set_text("Camera ID : ".. buffer(1,1):uint().. "")
 
-  subtree:add(pan,buffer(2,3)):set_text("Pan : ".. buffer(2,3):int()/-32768.0 .. "°")
-  subtree:add(tilt,buffer(5,3)):set_text("Tilt : ".. buffer(5,3):int()/32768.0 .. "°")
-  subtree:add(roll,buffer(8,3)):set_text("Roll : ".. buffer(8,3):int()/32768.0 .. "°")
-
-  subtree:add(x,buffer(11,3)):set_text("X : ".. buffer(11,3):int()/64000.0 .. "m")
-  subtree:add(y,buffer(14,3)):set_text("Y : ".. buffer(14,3):int()/64000.0 .. "m")
-  subtree:add(height,buffer(17,3)):set_text("Height (Z) : ".. buffer(17,3):int()/64000.0 .. "m")
+  subtree:add(pan, buffer(2,3)):set_text("Pan : ".. read_angle(buffer, 2) .. "°")
+  subtree:add(tilt, buffer(5,3)):set_text("Tilt : ".. read_angle(buffer, 5) .. "°")
+  subtree:add(roll, buffer(8,3)):set_text("Roll : ".. read_angle(buffer, 8) .. "°")
+  
+  subtree:add(x, buffer(11, 3)):set_text("X : " .. read_position(buffer, 11) .. "m")
+  subtree:add(y, buffer(14, 3)):set_text("Y : " .. read_position(buffer, 14) .. "m")
+  subtree:add(height, buffer(17, 3)):set_text("Height (Z) : " .. read_position(buffer, 17) .. "m")
  
   subtree:add(zoom,buffer(20,3)):set_text("Zoom : ".. buffer(20,3):uint().. "")
   subtree:add(focus,buffer(23,3)):set_text("Focus : ".. buffer(23,3):uint().."")
